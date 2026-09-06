@@ -7,6 +7,7 @@ export class DogModel {
   tail = new THREE.Group();
   legs: THREE.Group[] = [];
   ears: THREE.Mesh[] = [];
+  shadow:THREE.Mesh;
   sparkles = new THREE.Group();
   constructor(scene:THREE.Scene) {
     scene.add(this.root);this.root.add(this.body);
@@ -36,11 +37,12 @@ export class DogModel {
     for(let i=0;i<3;i++){const sparkle=new THREE.Mesh(new THREE.OctahedronGeometry(.035),new THREE.MeshBasicMaterial({color:'#ffe08a'}));sparkle.position.set(Math.sin(i*2.1)*.18,.25+Math.cos(i*2.1)*.16,.3);this.sparkles.add(sparkle);}
     // Soft grounding shadow stays readable even with real-time shadows disabled.
     const shadow=new THREE.Mesh(new THREE.CircleGeometry(.51,24),new THREE.MeshBasicMaterial({color:'#5c503c',transparent:true,opacity:.14,depthWrite:false}));
-    shadow.rotation.x=-Math.PI/2;shadow.position.y=.035;shadow.scale.set(.8,1.4,1);this.root.add(shadow);
+    shadow.rotation.x=-Math.PI/2;shadow.position.y=.035;shadow.scale.set(.8,1.4,1);this.root.add(shadow);this.shadow=shadow;
   }
-  animate(time:number,speed:number,anger:number,eating=false,immune=false) {
-    this.legs.forEach((l,i)=>l.rotation.x=Math.sin(time*(speed>3?18:12)+(i===0||i===3?0:Math.PI))*Math.min(speed*.16,.65));
-    this.body.position.y=Math.abs(Math.sin(time*12))*.024*Math.min(speed,2);
+  animate(time:number,speed:number,anger:number,eating=false,immune=false,airborne=false) {
+    this.shadow.visible=!airborne;
+    this.legs.forEach((l,i)=>l.rotation.x=airborne?(i%2===0?-.5:.65):Math.sin(time*(speed>3?18:12)+(i===0||i===3?0:Math.PI))*Math.min(speed*.16,.65));
+    this.body.position.y=airborne?0:Math.abs(Math.sin(time*12))*.024*Math.min(speed,2);
     this.tail.rotation.z=Math.sin(time*(anger>74?14:8))*.5;
     this.head.rotation.x=eating?.64:Math.sin(time*1.5)*.05;
     this.head.rotation.y=eating?0:Math.sin(time*.75)*.12;

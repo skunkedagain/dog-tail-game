@@ -1,3 +1,7 @@
+# Approved furniture jumping update
+
+C triggers a manual toddler jump; Space/click continues to grab. No automatic or held-key repeat jumps. Both actors use gravity and collide with furniture tops and walls. The dog chooses occasional escape jumps with verified clear landings and a cooldown. This supersedes any earlier ground-only movement assumptions below.
+
 # Dog Tail Game — design and development plan
 
 **Status:** Approved baseline, now implemented as the first desktop release. See `README.md` for shipped features, verification, and the deferred backlog.  

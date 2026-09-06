@@ -1,10 +1,12 @@
-import { distance,direction,toward,seededRandom,type V2 } from '../config/balance';
+import { escapeJump } from './jump';
+import { B,distance,direction,toward,seededRandom,type V2 } from '../config/balance';
 import { Navigation } from '../navigation/grid';
 import type { RoundState } from '../rules/round';
 export type DogState='watch'|'wander'|'flee'|'burst'|'rest'|'seek'|'eat'|'toy'|'warning'|'juke';
 export class DogAI {
   state:DogState='watch';velocity:V2={x:0,z:0};yaw=0;path:V2[]=[];timer=1;replan=0;burstCooldown=0;pursuit=0;distractionCooldown=0;lastSeen:V2={x:1.8,z:3.2};memory=0;
   target:V2|null=null;pendingTreat=false;consumed=false;stuck=0;previous:V2={x:1.1,z:1.8};random=seededRandom(32);lastGoals:V2[]=[];
+  jumpRequested=false;jumpCooldown=0;flightTime=0;
   jukeCooldown=8;lean=0;
   constructor(readonly nav:Navigation){}
   caught(){this.state='burst';this.timer=1;this.burstCooldown=5;this.replan=0;this.target=null;this.distractionCooldown=6;}
@@ -18,7 +20,10 @@ export class DogAI {
     this.path=this.nav.path(pos,this.nav.nearest({x:-pos.x,z:-pos.z}));
   }
   goalScore(p:V2,pos:V2,threat:V2){return distance(p,threat)*1.4-distance(pos,p)*.4+(!this.nav.lineClear(p,threat,0)?1.3:0)-this.lastGoals.reduce((v,g)=>v+(distance(p,g)<1.5?2:0),0);}
-  update(dt:number,pos:V2,player:V2,s:RoundState){
+  update(dt:number,pos:V2,player:V2,s:RoundState,grounded=true){
+    this.jumpRequested=false;this.jumpCooldown=Math.max(0,this.jumpCooldown-dt);
+    if(this.flightTime>0&&!grounded){this.flightTime=Math.max(.001,this.flightTime-dt);return;}
+    if(this.flightTime>0){this.flightTime=0;this.path=[];this.replan=0;}
     this.timer-=dt;this.replan-=dt;this.burstCooldown=Math.max(0,this.burstCooldown-dt);this.distractionCooldown=Math.max(0,this.distractionCooldown-dt);this.consumed=false;
     this.jukeCooldown=Math.max(0,this.jukeCooldown-dt);
     const d=distance(pos,player),visible=d<5&&this.nav.lineClear(pos,player,0);
@@ -44,6 +49,10 @@ export class DogAI {
     }
     if(['flee','wander','burst','rest'].includes(this.state)&&(this.replan<=0||!this.path.length)){
       this.pickGoal(pos,this.memory>0?this.lastSeen:{x:0,z:0});this.replan=this.state==='burst'?.7:1.1;
+    }
+    if(grounded&&this.jumpCooldown===0&&d<3.8&&['flee','burst'].includes(this.state)&&s.warning===null){
+      const dir=escapeJump(this.nav,pos,player);
+      if(dir){this.jumpRequested=true;this.jumpCooldown=B.dogJumpCooldown;this.flightTime=2*B.jumpSpeed/B.gravity;this.velocity={x:dir.x*B.dogJumpSpeed,z:dir.z*B.dogJumpSpeed};this.yaw=Math.atan2(-dir.x,-dir.z);this.path=[];return;}
     }
     if(distance(pos,this.previous)<.001&&Math.hypot(this.velocity.x,this.velocity.z)>.3)this.stuck+=dt;else this.stuck=0;
     this.previous={...pos};if(this.stuck>.75){this.replan=0;this.path=[];this.stuck=0;}

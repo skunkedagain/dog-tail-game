@@ -2,6 +2,38 @@ import { test,expect,type Page } from '@playwright/test';
 async function boot(page:Page){await page.goto('/?debug');await expect(page.getByRole('button',{name:"Let's play"})).toBeVisible();}
 async function start(page:Page){await page.evaluate(()=>{(window as any).__dogGame.start();});await expect.poll(async()=>(await snap(page)).mode,{timeout:10000}).toBe('playing');}
 async function snap(page:Page){return page.evaluate(()=>(window as any).__dogGame.snapshot());}
+test('C jumps only on press, clears furniture, and pause freezes flight',async({page})=>{
+  await boot(page);await start(page);
+  await page.evaluate(()=>{const d=(window as any).__dogGame;d.place({x:-2.4,z:3.8},{x:2,z:1});d.freezeDog();});
+  await page.waitForTimeout(150);expect((await snap(page)).playerY).toBe(0);
+  await page.keyboard.down('KeyC');await expect.poll(async()=>(await snap(page)).playerY).toBeGreaterThan(.5);
+  await page.keyboard.press('Escape');const paused=await snap(page);await page.waitForTimeout(200);expect((await snap(page)).playerY).toBe(paused.playerY);
+  await page.keyboard.up('KeyC');await page.getByRole('button',{name:'Back to mischief'}).click();
+  await expect.poll(async()=>(await snap(page)).playerGrounded).toBe(true);
+  await page.keyboard.down('KeyW');await page.keyboard.down('KeyC');await expect.poll(async()=>(await snap(page)).playerY).toBeGreaterThan(1);
+  await page.screenshot({path:'/private/tmp/dog-tail-jump.png'});
+  await page.waitForTimeout(900);await page.keyboard.up('KeyW');
+  await expect.poll(async()=>(await snap(page)).playerY).toBe(0);const landed=await snap(page);expect(landed.player.z).toBeLessThan(1.9);expect(landed.hp).toBe(100);
+  await page.waitForTimeout(450);expect((await snap(page)).playerY).toBe(0);await page.keyboard.up('KeyC');
+  await page.keyboard.press('KeyC');await expect.poll(async()=>(await snap(page)).playerY).toBeGreaterThan(.5);
+});
+test('the dog jumps over furniture while escaping',async({page})=>{
+  await boot(page);await start(page);
+  await page.evaluate(()=>{const d=(window as any).__dogGame;d.place({x:-.5,z:3.5},{x:-.5,z:1.8});});
+  await expect.poll(async()=>(await snap(page)).dogY).toBeGreaterThan(.7);
+  await page.screenshot({path:'/private/tmp/dog-tail-dog-jump.png'});
+  await expect.poll(async()=>(await snap(page)).dogGrounded).toBe(true);
+  const s=await snap(page);expect(s.dogY).toBe(0);expect(Math.hypot(s.dog.x+.5,s.dog.z-3.5)).toBeGreaterThan(3);
+});
+test('jump height limits tail reach and a restart returns both actors to the floor',async({page})=>{
+  await boot(page);await start(page);
+  await page.evaluate(()=>{const d=(window as any).__dogGame;d.place({x:2,z:2.6},{x:2,z:1.5});d.freezeDog();});
+  expect((await snap(page)).ready).toBe(true);
+  await page.keyboard.press('KeyC');await expect.poll(async()=>(await snap(page)).playerY).toBeGreaterThan(1.4);
+  await page.keyboard.press('Space');expect((await snap(page)).catches).toBe(0);
+  await page.evaluate(()=>(window as any).__dogGame.start());
+  expect(await snap(page)).toMatchObject({playerY:0,dogY:0,playerGrounded:true,dogGrounded:true});
+});
 test('scene loads, arrow keys look, movement works, and pause freezes clocks',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await boot(page);await page.screenshot({path:'/private/tmp/dog-tail-menu.png'});await start(page);
   const a=await snap(page);await page.keyboard.down('ArrowRight');await page.waitForTimeout(500);await page.keyboard.up('ArrowRight');const b=await snap(page);expect(b.yaw).toBeLessThan(a.yaw-.4);
@@ -58,6 +90,7 @@ test('sprint impacts knock the toddler down, pause freezes recovery, and bandage
   await expect.poll(async()=>(await snap(page)).knockedDown).toBeGreaterThan(1.5);
   await page.keyboard.up('KeyW');await page.keyboard.up('ShiftLeft');
   await page.waitForTimeout(250);const fallen=await snap(page);expect(fallen.eyeHeight).toBeLessThan(.5);expect(fallen.hp).toBe(88);await page.screenshot({path:'/private/tmp/dog-tail-knockdown.png'});
+  await page.keyboard.press('KeyC');expect((await snap(page)).playerY).toBe(0);
   await page.keyboard.down('KeyS');await page.waitForTimeout(150);await page.keyboard.up('KeyS');const locked=await snap(page);expect(locked.player.x).toBeCloseTo(fallen.player.x,3);expect(locked.time).toBeGreaterThan(fallen.time);
   await page.keyboard.press('Escape');const paused=await snap(page);await page.waitForTimeout(250);expect((await snap(page)).knockedDown).toBe(paused.knockedDown);
   await page.getByRole('button',{name:'Back to mischief'}).click();await expect.poll(async()=>(await snap(page)).knockedDown).toBe(0);

@@ -2,6 +2,7 @@ export const B = {
   duration: 180, step: 1 / 60,
   playerSpeed: 3.8, sprintSpeed: 5.2, acceleration: 12, braking: 16,
   sprintCapacity: 1.4, sprintRefillTime: 4, sprintRefillDelay: .75,
+  jumpSpeed: 7.6, gravity: 16, dogJumpSpeed: 4, dogJumpCooldown: 3.5,
   eyeHeight: .72, playerRadius: .24, dogRadius: .28,
   reach: 1.05, reachAngle: Math.PI / 6, grabWindow: .18, missCooldown: .45, immunity: 2.5,
   angerPerCatch: 18, treatRelief: 32, catchesPerTreat: 3, maxTreats: 3,

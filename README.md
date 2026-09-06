@@ -20,6 +20,7 @@ Open the local URL printed by Vite. A keyboard is required. Phones can display t
 | Move | WASD |
 | Look | **Arrow keys or mouse** |
 | Sprint | Shift |
+| Jump | C (press once per jump) |
 | Catch the tail | Space or left click |
 | Offer a treat | E |
 | Use held pickup | Q |
@@ -102,3 +103,9 @@ Dependency and font license notices are included under `public/licenses/` and co
 Hard impacts below 2 m/s cause no damage. At 2–3.2 m/s they cause a brief bump; at 3.2–4.5 m/s they cause an 0.8-second stumble at 30% movement speed. At 4.5 m/s or above, the toddler falls for 2.2 seconds: the camera lowers and rises as he gets up, movement and item/grab actions are unavailable, and the dog and round timer continue. Looking remains available; pause freezes recovery too. Soft furniture still causes no damage or knockdown.
 
 HP does not regenerate. Collect a bandage kit and use Q to recover up to 30 HP, capped at 100. A kit is available from round start and in the later refill rotation. It shares the held-item slot, can be swapped with F, and is kept if used at full health. Teddy protection halves impact damage but does not prevent losing balance.
+
+## Furniture jumps
+
+Press **C** to jump; hold WASD to steer and Shift to cover more ground. Space/click still grabs the tail. Jump before reaching the edge of furniture. You can land on furniture and jump again, or walk off to drop down. Holding C does not repeat jumps, and jumping is disabled while stumbling or getting up.
+
+When chased, the dog can leap over furniture toward a clear floor landing, with a 3.5-second cooldown. The flight is checked against furniture and walls before takeoff. Both characters have gravity and height-aware collisions; walls remain solid, and tail grabs account for vertical distance.
