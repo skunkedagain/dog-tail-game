@@ -1,3 +1,4 @@
+import { Leaderboard } from '../online/leaderboard';
 import * as THREE from 'three';
 import { B,clamp,distance,toward,type V2 } from '../config/balance';
 import { makeRoom,ball,blockers } from '../levels/room';
@@ -17,6 +18,7 @@ export class Game {
   ui:UI;renderer:THREE.WebGLRenderer;scene=new THREE.Scene();camera:THREE.PerspectiveCamera;
   model:DogModel;nav=new Navigation(blockers);ai=new DogAI(this.nav);sound=new Sound();pickups:Pickups;
   controls:Controls;physics!:Physics;player!:Actor;dog!:Actor;velocity:V2={x:0,z:0};
+  leaderboard=new Leaderboard();
   state:RoundState=newRound();mode:Mode='loading';countdown=3;resumeMode:Mode='playing';
   stored=readStorage();settings=this.stored.settings;best=this.stored.best;
   previous=0;accumulator=0;visualTime=0;stepTime=0;reachWindow=0;reachSuccess=false;handTime=0;
@@ -26,9 +28,9 @@ export class Game {
   prevPlayer:V2={x:1.8,z:3.2};prevDog:V2={x:1.1,z:1.8};wasWarning=false;
   debugEnabled=import.meta.env.DEV&&new URLSearchParams(location.search).has('debug');
   constructor(app:HTMLElement){
-    this.ui=new UI(app);
+    this.ui=new UI(app);this.ui.setTouchMode(this.settings.touch);
     this.renderer=new THREE.WebGLRenderer({canvas:document.querySelector('#game')!,antialias:true,powerPreference:'high-performance'});
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));this.renderer.setSize(innerWidth,innerHeight);this.renderer.shadowMap.enabled=this.settings.shadows;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio,this.settings.touch?1.25:1.5));this.renderer.setSize(innerWidth,innerHeight,false);this.renderer.shadowMap.enabled=this.settings.shadows;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;
     this.camera=new THREE.PerspectiveCamera(this.settings.fov,innerWidth/innerHeight,.035,55);this.camera.rotation.order='YXZ';this.scene.add(this.camera);
     makeRoom(this.scene);this.model=new DogModel(this.scene);this.model.root.position.set(1.1,0,1.8);this.model.root.rotation.y=-.6;
     this.pickups=new Pickups(this.scene);this.controls=new Controls(this.renderer.domElement,this.settings);this.controls.onPause=()=>this.pause();
@@ -39,14 +41,16 @@ export class Game {
     }this.hands.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=false;o.frustumCulled=false;}});
     this.hands.visible=false;
     this.ui.menu.innerHTML='<div class="eyebrow">MAKE YOURSELF AT HOME</div><h1>Little feet.<br><em>Big mischief.</em></h1><p>Waking up the dog…</p>';
-    addEventListener('resize',()=>{this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();});
+    const resize=()=>{const width=this.renderer.domElement.clientWidth,height=this.renderer.domElement.clientHeight;this.renderer.setSize(width,height,false);this.camera.aspect=width/height;this.camera.updateProjectionMatrix();};
+    addEventListener('resize',resize);window.visualViewport?.addEventListener('resize',resize);addEventListener('orientationchange',()=>this.controls.reset());resize();
     this.ui.el('pause-button').addEventListener('click',()=>this.pause());
     this.renderer.setAnimationLoop(t=>this.frame(t));
   }
   async init(){this.physics=await initializePhysics();this.player=this.physics.actor({x:1.8,z:3.2},B.playerRadius,.9);this.dog=this.physics.actor({x:1.1,z:1.8},B.dogRadius,.9);this.physics.step();this.showTitle();this.registerTools();if(this.debugEnabled)this.registerDebug();}
   bind(id:string,fn:()=>void){this.ui.el(id).onclick=fn;}
-  showTitle(){this.mode='menu';this.controls.active=false;this.controls.reset();this.controls.unlock();this.ui.title(this.best);this.hands.visible=false;this.ui.countdown.hidden=true;this.ui.toast.hidden=true;this.bind('start',()=>this.start());this.bind('settings',()=>this.showSettings());}
+  showTitle(){this.mode='menu';this.controls.active=false;this.controls.reset();this.controls.unlock();this.ui.title(this.best);this.hands.visible=false;this.ui.countdown.hidden=true;this.ui.toast.hidden=true;this.bind('start',()=>this.start());this.bind('settings',()=>this.showSettings());this.bind('high-scores',()=>this.showLeaderboard());}
   start(lock=true){
+    this.leaderboard.startRound();
     this.state=newRound();this.velocity={x:0,z:0};this.controls.reset();this.controls.yaw=0;this.controls.pitch=-.055;
     this.physics.teleport(this.player,{x:1.8,z:3.2});this.physics.teleport(this.dog,{x:1.1,z:1.8});this.physics.step();
     this.prevPlayerY=0;this.prevDogY=0;this.prevPlayer={...this.player.position};this.prevDog={...this.dog.position};this.ai=new DogAI(this.nav);this.ai.yaw=.15;this.pickups.reset();
@@ -58,14 +62,19 @@ export class Game {
   }
   pause(){if(this.mode!=='playing'&&this.mode!=='countdown')return;this.resumeMode=this.mode;this.mode='paused';this.controls.active=false;this.controls.reset();this.controls.unlock();this.sound.pause();this.ui.countdown.hidden=true;this.ui.pause();this.bind('resume',()=>this.resume());this.bind('restart',()=>this.start());this.bind('settings',()=>this.showSettings());}
   resume(){this.mode=this.resumeMode;this.controls.active=true;this.controls.reset();this.accumulator=0;this.sound.unlock();void this.controls.lock();this.ui.play();this.camera.fov=this.settings.fov;this.camera.updateProjectionMatrix();this.ui.countdown.hidden=this.mode!=='countdown';this.renderer.domElement.focus();}
-  showSettings(){this.ui.settings(this.settings);for(const id of ['sensitivity','fov','bob','sound','invert','shadows'] as const){const input=this.ui.el(id) as HTMLInputElement;input.oninput=()=>{
+  showSettings(){this.ui.settings(this.settings);for(const id of ['sensitivity','fov','bob','sound','invert','shadows','touch'] as const){const input=this.ui.el(id) as HTMLInputElement;input.oninput=()=>{
       if(id==='sensitivity'||id==='fov')this.settings[id]=Number(input.value);else this.settings[id]=input.checked;
-      this.sound.enabled=this.settings.sound;this.renderer.shadowMap.enabled=this.settings.shadows;saveStorage(this.best,this.settings);
+      this.sound.enabled=this.settings.sound;this.renderer.shadowMap.enabled=this.settings.shadows;this.ui.setTouchMode(this.settings.touch);this.renderer.setPixelRatio(Math.min(devicePixelRatio,this.settings.touch?1.25:1.5));this.controls.reset();saveStorage(this.best,this.settings);
     };}
     this.bind('back',()=>{if(this.mode==='paused'){this.ui.pause();this.bind('resume',()=>this.resume());this.bind('restart',()=>this.start());this.bind('settings',()=>this.showSettings());}else this.showTitle();});
   }
   end(){if(this.mode==='results')return;this.mode='results';this.controls.active=false;this.controls.reset();this.controls.unlock();this.hands.visible=false;this.ui.countdown.hidden=true;
-    const isNew=this.state.score>this.best;this.best=Math.max(this.best,this.state.score);saveStorage(this.best,this.settings);this.ui.results(this.state,this.best,isNew);this.sound.end();this.bind('restart',()=>this.start());this.bind('home',()=>this.showTitle());
+    const isNew=this.state.score>this.best;this.best=Math.max(this.best,this.state.score);saveStorage(this.best,this.settings);this.showResults(isNew);this.sound.end();
+  }
+  showResults(isNew=false){this.ui.results(this.state,this.best,isNew);this.bind('restart',()=>this.start());this.bind('home',()=>this.showTitle());this.bind('high-scores',()=>this.showLeaderboard(true));this.leaderboard.mountSubmission(this.ui.el('score-submission'),this.state,this.settings.touch?'touch':'keyboard');}
+  showLeaderboard(fromResults=false){
+    this.ui.showMenu();this.ui.menu.classList.remove('results');this.ui.menu.innerHTML='<div class="eyebrow">THE NEIGHBORHOOD’S BEST</div><h1>Big little<br><em>legends.</em></h1><p>The top 20 chases. Can you make the list?</p><div id="leaderboard"></div><button id="scores-back" class="primary">Back to the game <span>↩</span></button>';
+    this.leaderboard.mountScores(this.ui.el('leaderboard'));this.bind('scores-back',()=>fromResults?this.showResults():this.showTitle());
   }
   frame(ms:number){const elapsed=this.previous?(ms-this.previous)/1000:0;this.previous=ms;const dt=Math.min(elapsed,.08);this.visualTime+=dt;
     if(elapsed>2&&this.mode==='playing')this.pause();
@@ -74,13 +83,13 @@ export class Game {
       if(steps===5)this.accumulator=0;
       if(this.mode==='playing'){
       this.renderActors(this.accumulator/B.step);
-      const query=this.reachable();let label=query.label;const nearby=this.pickups.nearby(this.player.position);if(nearby&&this.state.pickup&&this.player.y<=.25&&this.state.knockedDown===0)label=`F · Swap for ${pickupNames[nearby.kind]}`;
+      const query=this.reachable();let label=query.label;const nearby=this.pickups.nearby(this.player.position);if(nearby&&this.state.pickup&&this.player.y<=.25&&this.state.knockedDown===0)label=`${this.settings.touch?'Swap':'F'} · Swap for ${pickupNames[nearby.kind]}`;
       this.ui.update(this.state,dt,query.ready,label,this.controls.locked);
       }
     }else if(this.mode==='countdown'){
       const prev=Math.ceil(this.countdown);this.countdown-=dt;this.controls.look(dt);this.ui.countdown.innerHTML=`${Math.max(1,Math.ceil(this.countdown))}<small>READY, LITTLE LEGS?</small>`;if(Math.ceil(this.countdown)<prev)this.sound.tone(440+220*(3-Math.ceil(this.countdown)),.1);
       this.renderActors(1);this.ui.update(this.state,dt,false,'',this.controls.locked);
-      if(this.countdown<=0){this.mode='playing';this.controls.edges.clear();this.ui.countdown.hidden=true;this.ui.notify('Catch the tail! Space or click when it glows.',3);}
+      if(this.countdown<=0){this.mode='playing';this.controls.edges.clear();this.ui.countdown.hidden=true;this.ui.notify(this.settings.touch?'Tap Catch when the tail glows. Tap Jump to hop!':'Catch the tail! Space or click when it glows.',3);}
     }else if(this.mode==='menu'||this.mode==='loading'||this.mode==='results'){
       this.camera.fov=58;this.camera.updateProjectionMatrix();this.camera.position.set(4.9+Math.sin(this.visualTime*.07)*.12,2.6,4.1);this.camera.lookAt(-.6,.4,-.9);this.model.root.position.set(1.3,0,1.45);this.model.root.rotation.y=-.6;this.model.animate(this.visualTime,0,0);
     }
@@ -105,8 +114,8 @@ export class Game {
   update(dt:number){
     const s=this.state;if(s.ended){this.end();return;}
     this.prevPlayer={...this.player.position};this.prevDog={...this.dog.position};this.prevPlayerY=this.player.y;this.prevDogY=this.dog.y;this.controls.look(dt);
-    const keys=this.controls.keys;let x=Number(keys.has('KeyD'))-Number(keys.has('KeyA')),z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));const mag=Math.hypot(x,z);if(mag){x/=mag;z/=mag;}
-    const sprint=s.knockedDown===0&&mag>0&&(keys.has('ShiftLeft')||keys.has('ShiftRight'))&&s.sprint>dt;
+    const keys=this.controls.keys;let x=Number(keys.has('KeyD'))-Number(keys.has('KeyA')),z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));if(this.settings.touch){x+=this.controls.touch.move.x;z+=this.controls.touch.move.z;}const mag=Math.hypot(x,z);if(mag>1){x/=mag;z/=mag;}
+    const sprint=s.knockedDown===0&&mag>0&&(keys.has('ShiftLeft')||keys.has('ShiftRight')||(this.settings.touch&&this.controls.touch.sprinting))&&s.sprint>dt;
     if(sprint){s.sprint=Math.max(0,s.sprint-dt);s.sprintRest=0;}else{s.sprintRest+=dt;if(s.sprintRest>B.sprintRefillDelay)s.sprint=Math.min(B.sprintCapacity,s.sprint+dt*B.sprintCapacity/B.sprintRefillTime);}
     let maxSpeed=(sprint?B.sprintSpeed:B.playerSpeed)*(s.buff==='juice'?1.15:1);if(s.knockedDown>0){maxSpeed=0;this.velocity={x:0,z:0};}else if(s.stagger>0)maxSpeed*=.3;else if(s.softSlow>0)maxSpeed*=.7;
     const yaw=this.controls.yaw,tx=(x*Math.cos(yaw)+z*Math.sin(yaw))*maxSpeed,tz=(-x*Math.sin(yaw)+z*Math.cos(yaw))*maxSpeed;
@@ -121,7 +130,7 @@ export class Game {
     const grab=this.controls.take('Space','Grab');if(grab){s.cooling=0;if(s.knockedDown===0&&s.grabCooldown<=0){s.grabCooldown=B.missCooldown;this.reachWindow=B.grabWindow;this.reachSuccess=false;this.handTime=.35;}}
     if(this.controls.take('KeyE')&&s.knockedDown===0)this.useTreat();
     if(this.controls.take('KeyQ')&&s.knockedDown===0)this.usePickup();
-    this.pickups.update(dt,s.time,this.player.position,this.dog.position);const swap=this.controls.take('KeyF');const item=s.knockedDown>0||this.player.y>.25?null:this.pickups.collect(this.player.position,!!s.pickup,swap);if(item){s.pickup=item;this.ui.notify(`${pickupNames[item]}! Press Q to use.`);this.sound.treat();}
+    this.pickups.update(dt,s.time,this.player.position,this.dog.position);const swap=this.controls.take('KeyF');const item=s.knockedDown>0||this.player.y>.25?null:this.pickups.collect(this.player.position,!!s.pickup,swap);if(item){s.pickup=item;this.ui.notify(`${pickupNames[item]}! ${this.settings.touch?'Tap Use':'Press Q to use'}.`);this.sound.treat();}
     if(this.throwFlight>0){this.throwFlight=Math.max(0,this.throwFlight-dt);if(this.throwFlight===0&&this.ai.pendingTreat){this.ai.treat({x:this.throwTo.x,z:this.throwTo.z});this.treatArrived=true;}}
     // A toss takes a moment to land; accepted food then has priority over ordinary escape.
     if(!(this.ai.pendingTreat&&!this.treatArrived))this.ai.update(dt,this.dog.position,this.player.position,s,this.dog.grounded);
@@ -136,7 +145,7 @@ export class Game {
     let caught=false;
     if(this.reachWindow>0){this.reachWindow=Math.max(0,this.reachWindow-dt);if(!this.reachSuccess&&this.reachable().ready){const before=s.treats;const points=catchTail(s);if(points){caught=true;this.reachSuccess=true;this.ai.caught();this.clearThrow();this.sound.catch();this.ui.notify(`Got it! +${points}${s.treats>before?' · Treat earned!':''}`,1.8);}}}
     tickRules(s,dt,distance(this.player.position,this.dog.position)>4&&!grab&&!caught,this.ai.state==='eat');
-    if(s.warning!==null&&!this.wasWarning){this.sound.bark();this.ui.notify(s.treats?'A treat, quick! E calms the dog.':'Uh-oh! No treats left.',2);}
+    if(s.warning!==null&&!this.wasWarning){this.sound.bark();this.ui.notify(s.treats?(this.settings.touch?'Tap Treat, quick! Calm the dog.':'A treat, quick! E calms the dog.'):'Uh-oh! No treats left.',2);}
     this.wasWarning=s.warning!==null;
     if(s.ended)this.end();
   }
@@ -153,7 +162,7 @@ export class Game {
     const aimX=-Math.sin(this.controls.yaw)*Math.cos(this.controls.pitch),aimZ=-Math.cos(this.controls.yaw)*Math.cos(this.controls.pitch),aimY=Math.sin(this.controls.pitch);
     const aimed=(dx*aimX+dy*aimY+dz*aimZ)/Math.max(dist,.001)>Math.cos(B.reachAngle);
     const clear=!blockers.some(b=>b.h>Math.min(this.player.y+B.eyeHeight,this.dog.y+.74)&&segmentHits(p,tail,b,.025));
-    const ready=rear&&aimed&&clear;return {ready,label:ready?'SPACE / CLICK · Got your tail!':rear&&clear?'Aim at the tail':''};
+    const ready=rear&&aimed&&clear;return {ready,label:ready?(this.settings.touch?'CATCH · Got your tail!':'SPACE / CLICK · Got your tail!'):rear&&clear?'Aim at the tail':''};
   }
   useTreat(){const s=this.state;
     if(!s.treats){this.ui.notify(`Catch ${3-s.progress} more ${3-s.progress===1?'tail':'tails'} to earn a treat.`);return;}

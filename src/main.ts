@@ -6,6 +6,8 @@ import '@fontsource/dm-sans/latin-700.css';
 import '@fontsource/fraunces/latin-500.css';
 import '@fontsource/fraunces/latin-600.css';
 import './ui/style.css';
+import './ui/mobile.css';
+import './ui/leaderboard.css';
 const app=document.querySelector<HTMLDivElement>('#app')!;
 try {
   const game=new Game(app);
@@ -16,5 +18,5 @@ try {
   });
 } catch(error) {
   console.error('Renderer initialization failed',error);
-  app.innerHTML='<section class="menu"><div class="eyebrow">A LITTLE HOLD-UP</div><h1>We need a<br><em>little graphics help.</em></h1><p>This game needs WebGL 2. Try a current desktop browser with hardware acceleration turned on.</p><button class="primary" onclick="location.reload()">Try again ↗</button></section>';
+  app.innerHTML='<section class="menu"><div class="eyebrow">A LITTLE HOLD-UP</div><h1>We need a<br><em>little graphics help.</em></h1><p>This game needs WebGL 2. Try Safari on a recent iPhone or iPad, or a desktop browser with hardware acceleration turned on.</p><button class="primary" onclick="location.reload()">Try again ↗</button></section>';
 }

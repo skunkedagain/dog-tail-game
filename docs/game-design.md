@@ -1,3 +1,7 @@
+# Approved online and mobile update
+
+Add opt-in nickname submissions to a Supabase-backed public top-20 leaderboard. Add automatic touch controls for iPhone and iPad: joystick movement with sprint at the outer edge, swipe look, and separate Jump/Catch/Treat/Use/Swap buttons. Desktop controls remain available. These features supersede earlier mobile/leaderboard deferrals in the historical plan below.
+
 # Approved furniture jumping update
 
 C triggers a manual toddler jump; Space/click continues to grab. No automatic or held-key repeat jumps. Both actors use gravity and collide with furniture tops and walls. The dog chooses occasional escape jumps with verified clear landings and a cooldown. This supersedes any earlier ground-only movement assumptions below.

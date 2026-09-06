@@ -5,5 +5,5 @@
     "noEmit": true, "esModuleInterop": true, "resolveJsonModule": true,
     "noUnusedLocals": true, "noUnusedParameters": true
   },
-  "include": ["src", "tests", "*.config.ts"]
+  "include": ["src", "server", "api", "tests", "*.config.ts"]
 }

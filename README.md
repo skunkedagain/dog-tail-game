@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. A keyboard is required. Phones can display the game, but touch controls are not part of this release.
+Open the local URL printed by Vite. Play with a keyboard and mouse, or use the automatic touch controls on iPhone and iPad. Landscape gives mobile players a wider view.
 
 ## Controls
 
@@ -84,7 +84,7 @@ The production build contains no active test/debug hook. In development only, `?
 - `src/pickups/`, `src/audio/`, `src/ui/`: abilities, sound, and HUD/menu presentation.
 - `docs/game-design.md`: the approved design baseline and deferred feature ideas.
 
-The room is inspired by the five supplied photos, with enlarged lanes. The photos do not establish a kitchen layout. Kitchen/gates, crawling/climbing, the additional experimental pickups, full touch controls, public leaderboards, and custom rigged art remain the separate backlog defined in the plan.
+The room is inspired by the five supplied photos, with enlarged lanes. The photos do not establish a kitchen layout. Kitchen/gates, crawling/climbing, the additional experimental pickups, custom rigged art remain the separate backlog defined in the plan.
 
 This release is ready for hands-on playtesting. Automated checks verify behavior, not whether the chase feels fun to a particular player. Formal first-time-player balancing and a Safari/Firefox/device matrix have not been completed. Adjust dog reaction, recovery windows, reach, and anger pacing based on playtest observations before expanding the level.
 
@@ -109,3 +109,11 @@ HP does not regenerate. Collect a bandage kit and use Q to recover up to 30 HP, 
 Press **C** to jump; hold WASD to steer and Shift to cover more ground. Space/click still grabs the tail. Jump before reaching the edge of furniture. You can land on furniture and jump again, or walk off to drop down. Holding C does not repeat jumps, and jumping is disabled while stumbling or getting up.
 
 When chased, the dog can leap over furniture toward a clear floor landing, with a 3.5-second cooldown. The flight is checked against furniture and walls before takeoff. Both characters have gravity and height-aware collisions; walls remain solid, and tail grabs account for vertical distance.
+
+## Mobile play and shared high scores
+
+Touch mode activates on phones and tablets, and can be toggled in Settings & controls. Use the left stick to move, push it to the edge to sprint, and swipe the room to look. Jump, Catch, Treat, Use, and Swap have separate buttons. Jump remains a manual action. Touch inputs clear on pause, cancellation, rotation, and restart. Detailed shadows and camera bob default off on touch devices to reduce rendering cost and motion.
+
+**High scores** opens the public top 20 rounds. After a round, enter a nickname and choose **Post score**. Online failures never prevent local play. The Supabase schema and Vercel API are included; follow [the Supabase setup guide](docs/supabase-setup.md) to create the database tables and set the two server environment variables. Nothing has been provisioned or deployed automatically.
+
+Run the database and rule tests with `npm test`. Run desktop and leaderboard browser checks with `npm run test:browser`. For mobile browser checks, install WebKit with `npx playwright install webkit`, then run `npm run test:mobile` (Chrome must also be installed). These checks emulate iPhone/iPad layouts and input; use a real iOS device for final performance and Safari toolbar checks.
