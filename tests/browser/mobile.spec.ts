@@ -1,9 +1,27 @@
 import { test,expect,type Page } from '@playwright/test';
 const snap=(page:Page)=>page.evaluate(()=>(window as any).__dogGame.snapshot());
 async function start(page:Page){
-  await page.goto('/?debug');await page.getByRole('button',{name:"Let's play"}).tap();await expect(page.locator('#countdown')).toBeHidden({timeout:10000});
+  await page.goto('/?debug');await page.evaluate(()=>document.fonts.ready);await page.getByRole('button',{name:"Let's play"}).tap();await expect.poll(async()=>(await snap(page)).mode,{timeout:10000}).toBe('playing');
   await page.evaluate(()=>{const d=(window as any).__dogGame;d.place({x:1.4,z:3.5},{x:0,z:2});d.freezeDog();});
 }
+test('tapping the room grabs once, while swipes, holds and cancelled contacts do not grab',async({page})=>{
+  await start(page);
+  await page.evaluate(()=>{const d=(window as any).__dogGame;d.place({x:2,z:2.6},{x:2,z:1.5});d.freezeDog();});
+  const canvas=page.locator('#game');
+  const contact={pointerId:42,pointerType:'touch',clientX:200,clientY:230,bubbles:true};
+  await canvas.dispatchEvent('pointerdown',contact);
+  await canvas.dispatchEvent('pointermove',{...contact,clientX:250});
+  await canvas.dispatchEvent('pointermove',contact);
+  await canvas.dispatchEvent('pointerup',contact);
+  await canvas.dispatchEvent('pointerdown',contact);await canvas.dispatchEvent('pointercancel',contact);
+  await canvas.dispatchEvent('pointerdown',contact);await page.waitForTimeout(350);await canvas.dispatchEvent('pointerup',contact);
+  await page.locator('#move-stick').tap();
+  expect(await page.evaluate(()=>(window as any).__dogGame.state().grabCooldown)).toBe(0);
+  expect((await snap(page)).catches).toBe(0);
+  const viewport=page.viewportSize()!;await page.touchscreen.tap(viewport.width*.5,viewport.height*.55);
+  await expect.poll(async()=>(await snap(page)).catches).toBe(1);
+  await page.waitForTimeout(250);expect((await snap(page)).catches).toBe(1);
+});
 test('touch layout, simultaneous move/look/jump, cancellation, pause and all actions',async({page},info)=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await start(page);
   await expect(page.locator('#touch-controls')).toBeVisible();expect(await page.evaluate(()=>document.pointerLockElement==null)).toBe(true);

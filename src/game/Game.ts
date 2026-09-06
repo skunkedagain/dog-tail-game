@@ -89,7 +89,7 @@ export class Game {
     }else if(this.mode==='countdown'){
       const prev=Math.ceil(this.countdown);this.countdown-=dt;this.controls.look(dt);this.ui.countdown.innerHTML=`${Math.max(1,Math.ceil(this.countdown))}<small>READY, LITTLE LEGS?</small>`;if(Math.ceil(this.countdown)<prev)this.sound.tone(440+220*(3-Math.ceil(this.countdown)),.1);
       this.renderActors(1);this.ui.update(this.state,dt,false,'',this.controls.locked);
-      if(this.countdown<=0){this.mode='playing';this.controls.edges.clear();this.ui.countdown.hidden=true;this.ui.notify(this.settings.touch?'Tap Catch when the tail glows. Tap Jump to hop!':'Catch the tail! Space or click when it glows.',3);}
+      if(this.countdown<=0){this.mode='playing';this.controls.edges.clear();this.ui.countdown.hidden=true;this.ui.notify(this.settings.touch?'Tap the room when the tail glows. Swipe to look!':'Catch the tail! Space or click when it glows.',3);}
     }else if(this.mode==='menu'||this.mode==='loading'||this.mode==='results'){
       this.camera.fov=58;this.camera.updateProjectionMatrix();this.camera.position.set(4.9+Math.sin(this.visualTime*.07)*.12,2.6,4.1);this.camera.lookAt(-.6,.4,-.9);this.model.root.position.set(1.3,0,1.45);this.model.root.rotation.y=-.6;this.model.animate(this.visualTime,0,0);
     }
@@ -162,7 +162,7 @@ export class Game {
     const aimX=-Math.sin(this.controls.yaw)*Math.cos(this.controls.pitch),aimZ=-Math.cos(this.controls.yaw)*Math.cos(this.controls.pitch),aimY=Math.sin(this.controls.pitch);
     const aimed=(dx*aimX+dy*aimY+dz*aimZ)/Math.max(dist,.001)>Math.cos(B.reachAngle);
     const clear=!blockers.some(b=>b.h>Math.min(this.player.y+B.eyeHeight,this.dog.y+.74)&&segmentHits(p,tail,b,.025));
-    const ready=rear&&aimed&&clear;return {ready,label:ready?(this.settings.touch?'CATCH · Got your tail!':'SPACE / CLICK · Got your tail!'):rear&&clear?'Aim at the tail':''};
+    const ready=rear&&aimed&&clear;return {ready,label:ready?(this.settings.touch?'TAP · Got your tail!':'SPACE / CLICK · Got your tail!'):rear&&clear?'Aim at the tail':''};
   }
   useTreat(){const s=this.state;
     if(!s.treats){this.ui.notify(`Catch ${3-s.progress} more ${3-s.progress===1?'tail':'tails'} to earn a treat.`);return;}

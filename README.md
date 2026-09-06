@@ -112,7 +112,7 @@ When chased, the dog can leap over furniture toward a clear floor landing, with 
 
 ## Mobile play and shared high scores
 
-Touch mode activates on phones and tablets, and can be toggled in Settings & controls. Use the left stick to move, push it to the edge to sprint, and swipe the room to look. Jump, Catch, Treat, Use, and Swap have separate buttons. Jump remains a manual action. Touch inputs clear on pause, cancellation, rotation, and restart. Detailed shadows and camera bob default off on touch devices to reduce rendering cost and motion.
+Touch mode activates on phones and tablets, and can be toggled in Settings & controls. Use the left stick to move, push it to the edge to sprint, and swipe the room to look. A short tap on the room grabs the tail; swipes and holds do not. Jump, Catch, Treat, Use, and Swap have separate buttons. Jump remains a manual action. Touch inputs clear on pause, cancellation, rotation, and restart. Detailed shadows and camera bob default off on touch devices to reduce rendering cost and motion.
 
 **High scores** opens the public top 20 rounds. After a round, enter a nickname and choose **Post score**. Online failures never prevent local play. The Supabase schema and Vercel API are included; follow [the Supabase setup guide](docs/supabase-setup.md) to create the database tables and set the two server environment variables. Nothing has been provisioned or deployed automatically.
 
