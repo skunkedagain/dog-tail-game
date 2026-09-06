@@ -35,11 +35,11 @@ Mouse lock is requested on Start and Resume. If the browser declines, arrow-key 
 - Toddler-height movement with acceleration, limited sprint, reach animation, and comfortable look controls.
 - A golden cartoon dog with animated legs, ears, head and tail, obstacle-aware A* navigation, fleeing, bursts, recovery windows, and signaled jukes after four catches.
 - A photo-inspired living room with sectional, coffee table, tall windows, fireplace, ottoman, plants, and multiple chase routes.
-- Hard furniture damage and soft furniture slowing; health regeneration and damage cooldowns.
+- Hard furniture damage and soft furniture slowing; running stumbles, sprint knockdowns, and damage cooldowns.
 - Occlusion-aware rear tail catches, combo and clean-chase scoring, and a visible catch-protection cue.
 - Anger stages, cooling at a distance, and a four-second maximum-anger warning.
 - One treat every three catches, assisted tosses, protected eating, and warning rescues.
-- Juice boxes, teddy protection, squeaky toys, timed buffs, and one held pickup slot.
+- Juice boxes, teddy protection, squeaky toys, bandage kits, timed buffs, and one held pickup slot.
 - Original procedural 3D art and synthesized sound effects. Fonts are bundled locally; there are no required third-party asset requests at runtime.
 
 Catches add 18 anger. Treats remove 32, so repeated catches still require occasional distance. At 100 anger, offer a treat within four seconds or the round ends. Aim for the dog's rear tail; it glows with small sparkles while briefly protected after a catch.
@@ -96,3 +96,9 @@ This release is ready for hands-on playtesting. Automated checks verify behavior
 - The optional WebMCP read/pause registry was contract-tested with a test double. Native host WebMCP support was not validated.
 
 Dependency and font license notices are included under `public/licenses/` and copied into the deployment.
+
+## Collision and health update
+
+Hard impacts below 2 m/s cause no damage. At 2–3.2 m/s they cause a brief bump; at 3.2–4.5 m/s they cause an 0.8-second stumble at 30% movement speed. At 4.5 m/s or above, the toddler falls for 2.2 seconds: the camera lowers and rises as he gets up, movement and item/grab actions are unavailable, and the dog and round timer continue. Looking remains available; pause freezes recovery too. Soft furniture still causes no damage or knockdown.
+
+HP does not regenerate. Collect a bandage kit and use Q to recover up to 30 HP, capped at 100. A kit is available from round start and in the later refill rotation. It shares the held-item slot, can be swapped with F, and is kept if used at full health. Teddy protection halves impact damage but does not prevent losing balance.

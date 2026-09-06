@@ -6,7 +6,7 @@ export const B = {
   reach: 1.05, reachAngle: Math.PI / 6, grabWindow: .18, missCooldown: .45, immunity: 2.5,
   angerPerCatch: 18, treatRelief: 32, catchesPerTreat: 3, maxTreats: 3,
   treatCooldown: 8, warningTime: 4, coolingDelay: 4, coolingRate: 2,
-  regenDelay: 8, regenRate: 3, comboTime: 12,
+  fallTime: 2.2, stumbleTime: .8, healAmount: 30, comboTime: 12,
 } as const;
 export type V2 = { x: number; z: number };
 export const distance = (a: V2, b: V2) => Math.hypot(a.x-b.x,a.z-b.z);

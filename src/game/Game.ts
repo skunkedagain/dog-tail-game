@@ -6,7 +6,7 @@ import { DogAI } from '../dog/ai';
 import { Navigation,segmentHits } from '../navigation/grid';
 import { initializePhysics,type Physics,type Actor } from '../physics/world';
 import { Controls } from '../input/controls';
-import { catchTail,consumeTreat,hardImpact,newRound,spendTreat,tickRules,type RoundState } from '../rules/round';
+import { catchTail,consumeTreat,hardImpact,healWithPickup,newRound,spendTreat,tickRules,type RoundState } from '../rules/round';
 import { UI } from '../ui/hud';
 import { Sound } from '../audio/sound';
 import { Pickups,pickupNames } from '../pickups/pickups';
@@ -88,33 +88,37 @@ export class Game {
   renderActors(alpha:number){
     const p=this.player.position,d=this.dog.position,speed=Math.hypot(this.velocity.x,this.velocity.z);
     this.camera.position.set(THREE.MathUtils.lerp(this.prevPlayer.x,p.x,alpha),B.eyeHeight,THREE.MathUtils.lerp(this.prevPlayer.z,p.z,alpha));
-    if(this.settings.bob&&speed>.3)this.camera.position.y+=Math.sin(this.state.time*13)*.008*Math.min(speed/2,1);
-    this.camera.rotation.set(this.controls.pitch,this.controls.yaw,0,'YXZ');
+    const down=this.state.knockedDown;
+    const fall=down>0?Math.min(1,(B.fallTime-down)/.18,down/.65):0;
+    this.camera.position.y-=.44*THREE.MathUtils.smoothstep(fall,0,1);
+    if(this.state.stagger>0)this.camera.position.y-=.045*Math.sin(Math.PI*Math.min(1,this.state.stagger/B.stumbleTime));
+    if(this.settings.bob&&speed>.3&&down===0)this.camera.position.y+=Math.sin(this.state.time*13)*.008*Math.min(speed/2,1);
+    this.camera.rotation.set(this.controls.pitch-fall*.12,this.controls.yaw,0,'YXZ');
     this.model.root.position.set(THREE.MathUtils.lerp(this.prevDog.x,d.x,alpha),0,THREE.MathUtils.lerp(this.prevDog.z,d.z,alpha));this.model.root.rotation.y=this.ai.yaw;
     this.model.animate(this.visualTime,Math.hypot(this.ai.velocity.x,this.ai.velocity.z),this.state.anger,this.ai.state==='eat',this.state.immunity>0);
     this.model.body.rotation.z=this.ai.state==='juke'?this.ai.lean:0;
-    const reach=this.handTime>0?Math.sin((1-this.handTime/.35)*Math.PI):0;this.hands.position.set(0,reach*.13,-reach*.2);
+    const reach=this.handTime>0?Math.sin((1-this.handTime/.35)*Math.PI):0;this.hands.position.set(0,reach*.13+fall*.17,-reach*.2);
     if(this.thrown&&this.throwFlight>0){const t=1-this.throwFlight/.38;this.thrown.position.lerpVectors(this.throwFrom,this.throwTo,t);this.thrown.position.y+=Math.sin(t*Math.PI)*.7;}
   }
   update(dt:number){
     const s=this.state;if(s.ended){this.end();return;}
     this.prevPlayer={...this.player.position};this.prevDog={...this.dog.position};this.controls.look(dt);
     const keys=this.controls.keys;let x=Number(keys.has('KeyD'))-Number(keys.has('KeyA')),z=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));const mag=Math.hypot(x,z);if(mag){x/=mag;z/=mag;}
-    const sprint=mag>0&&(keys.has('ShiftLeft')||keys.has('ShiftRight'))&&s.sprint>dt;
+    const sprint=s.knockedDown===0&&mag>0&&(keys.has('ShiftLeft')||keys.has('ShiftRight'))&&s.sprint>dt;
     if(sprint){s.sprint=Math.max(0,s.sprint-dt);s.sprintRest=0;}else{s.sprintRest+=dt;if(s.sprintRest>B.sprintRefillDelay)s.sprint=Math.min(B.sprintCapacity,s.sprint+dt*B.sprintCapacity/B.sprintRefillTime);}
-    let maxSpeed=(sprint?B.sprintSpeed:B.playerSpeed)*(s.buff==='juice'?1.15:1);if(s.stagger>0)maxSpeed*=.6;else if(s.softSlow>0)maxSpeed*=.7;
+    let maxSpeed=(sprint?B.sprintSpeed:B.playerSpeed)*(s.buff==='juice'?1.15:1);if(s.knockedDown>0){maxSpeed=0;this.velocity={x:0,z:0};}else if(s.stagger>0)maxSpeed*=.3;else if(s.softSlow>0)maxSpeed*=.7;
     const yaw=this.controls.yaw,tx=(x*Math.cos(yaw)+z*Math.sin(yaw))*maxSpeed,tz=(-x*Math.sin(yaw)+z*Math.cos(yaw))*maxSpeed;
     const acceleration=mag?B.acceleration:B.braking;this.velocity.x=toward(this.velocity.x,tx,acceleration*dt);this.velocity.z=toward(this.velocity.z,tz,acceleration*dt);
     const hit=this.physics.move(this.player,this.velocity,dt);this.velocity=hit.actual;
     if(hit.soft){if(s.softSlow===0)this.sound.soft();s.softSlow=.4;}
-    const damage=hardImpact(s,hit.speed);if(damage){this.sound.bump();this.ui.notify(`Bonk! −${damage} HP`,1.4);this.ui.flash.classList.remove('active');void this.ui.flash.offsetWidth;this.ui.flash.classList.add('active');}
+    const damage=hardImpact(s,hit.speed);if(damage){this.sound.bump();this.ui.notify(s.knockedDown>0?`Whoops! Down for ${B.fallTime}s · −${damage} HP`:s.stagger>=B.stumbleTime?`Whoa! Lost your balance · −${damage} HP`:`Bonk! −${damage} HP`,s.knockedDown>0?B.fallTime:1.4);if(s.knockedDown>0){this.velocity={x:0,z:0};this.reachWindow=0;this.handTime=0;}this.ui.flash.classList.remove('active');void this.ui.flash.offsetWidth;this.ui.flash.classList.add('active');}
     if(s.ended){this.end();return;}
     this.stepTime+=dt;if(mag&&Math.hypot(this.velocity.x,this.velocity.z)>.5&&this.stepTime>(sprint?.22:.32)){this.stepTime=0;this.sound.step(sprint);}
     this.handTime=Math.max(0,this.handTime-dt);
-    const grab=this.controls.take('Space','Grab');if(grab){s.cooling=0;if(s.grabCooldown<=0){s.grabCooldown=B.missCooldown;this.reachWindow=B.grabWindow;this.reachSuccess=false;this.handTime=.35;}}
-    if(this.controls.take('KeyE'))this.useTreat();
-    if(this.controls.take('KeyQ'))this.usePickup();
-    this.pickups.update(dt,s.time,this.player.position,this.dog.position);const item=this.pickups.collect(this.player.position,!!s.pickup,this.controls.take('KeyF'));if(item){s.pickup=item;this.ui.notify(`${pickupNames[item]}! Press Q to use.`);this.sound.treat();}
+    const grab=this.controls.take('Space','Grab');if(grab){s.cooling=0;if(s.knockedDown===0&&s.grabCooldown<=0){s.grabCooldown=B.missCooldown;this.reachWindow=B.grabWindow;this.reachSuccess=false;this.handTime=.35;}}
+    if(this.controls.take('KeyE')&&s.knockedDown===0)this.useTreat();
+    if(this.controls.take('KeyQ')&&s.knockedDown===0)this.usePickup();
+    this.pickups.update(dt,s.time,this.player.position,this.dog.position);const swap=this.controls.take('KeyF');const item=s.knockedDown>0?null:this.pickups.collect(this.player.position,!!s.pickup,swap);if(item){s.pickup=item;this.ui.notify(`${pickupNames[item]}! Press Q to use.`);this.sound.treat();}
     if(this.throwFlight>0){this.throwFlight=Math.max(0,this.throwFlight-dt);if(this.throwFlight===0&&this.ai.pendingTreat){this.ai.treat({x:this.throwTo.x,z:this.throwTo.z});this.treatArrived=true;}}
     // A toss takes a moment to land; accepted food then has priority over ordinary escape.
     if(!(this.ai.pendingTreat&&!this.treatArrived))this.ai.update(dt,this.dog.position,this.player.position,s);
@@ -136,6 +140,7 @@ export class Game {
     const s=this.state,d=this.dog.position,p=this.player.position,angle=this.ai.yaw;
     const tail={x:d.x+Math.sin(angle)*.59,z:d.z+Math.cos(angle)*.59};const dx=tail.x-p.x,dz=tail.z-p.z,dy=.74-B.eyeHeight,dist=Math.hypot(dx,dy,dz);
     const near=dist<B.reach+.18;
+    if(s.knockedDown>0)return {ready:false,label:`Getting back up… ${s.knockedDown.toFixed(1)}s`};
     if(!near)return {ready:false,label:''};
     if(s.warning!==null)return {ready:false,label:'Time for a treat!'};
     if(this.ai.state==='eat'||this.ai.pendingTreat)return {ready:false,label:'Let the good dog eat.'};
@@ -158,7 +163,8 @@ export class Game {
     this.clearThrow();this.ai.pendingTreat=true;this.ai.target=target;this.ai.state='seek';this.ai.velocity={x:0,z:0};this.treatArrived=false;
     this.thrown=ball(this.scene,.07,p.x,B.eyeHeight,p.z,'#d59b49',[1.2,.6,1]);this.throwFrom.set(p.x,B.eyeHeight,p.z);this.throwTo.set(target.x,.08,target.z);this.throwFlight=.38;this.ui.notify('Biscuit delivery!',1.3);
   }
-  usePickup(){const s=this.state;if(!s.pickup){this.ui.notify('Find a juice box, teddy, or toy around the room.');return;}
+  usePickup(){const s=this.state;if(!s.pickup){this.ui.notify('Find a bandage kit, juice box, teddy, or toy.');return;}
+    if(s.pickup==='bandage'){const healed=healWithPickup(s);if(healed){this.ui.notify(`All patched up! +${healed} HP`);this.sound.treat();}else this.ui.notify('Already at full health. Save it for later.');return;}
     if(s.pickup==='toy'){
       if(s.warning!==null){this.ui.notify('Only a treat will help now.');return;}
       if(this.ai.pendingTreat||this.ai.state==='eat'||this.ai.distractionCooldown>0){this.ui.notify('The dog needs a moment before another toy.');return;}
@@ -169,7 +175,7 @@ export class Game {
   }
   clearThrow(){if(this.thrown){this.scene.remove(this.thrown);this.thrown.geometry.dispose();this.thrown=null;}this.throwFlight=0;this.treatArrived=false;}
   clearToy(){if(this.toyMesh){this.scene.remove(this.toyMesh);this.toyMesh.geometry.dispose();this.toyMesh=null;}}
-  snapshot(){return {mode:this.mode,time:Math.round(this.state.time*100)/100,score:this.state.score,catches:this.state.catches,hp:this.state.hp,anger:this.state.anger,treats:this.state.treats,progress:this.state.progress,ended:this.state.ended,dogState:this.ai.state,player:{...this.player.position},dog:{...this.dog.position},yaw:this.controls.yaw,pitch:this.controls.pitch,ready:this.reachable().ready,render:{calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries}};}
+  snapshot(){return {mode:this.mode,time:Math.round(this.state.time*100)/100,score:this.state.score,catches:this.state.catches,hp:this.state.hp,anger:this.state.anger,treats:this.state.treats,progress:this.state.progress,ended:this.state.ended,dogState:this.ai.state,knockedDown:this.state.knockedDown,stagger:this.state.stagger,eyeHeight:this.camera.position.y,player:{...this.player.position},dog:{...this.dog.position},yaw:this.controls.yaw,pitch:this.controls.pitch,ready:this.reachable().ready,render:{calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries}};}
   registerTools(){
     type Tool={name:string;description:string;inputSchema:object;annotations:{readOnlyHint:boolean};execute:(input:unknown)=>unknown};
     const context=(document as Document&{modelContext?:{registerTool:(tool:Tool,options:{signal:AbortSignal})=>void|Promise<void>}}).modelContext;

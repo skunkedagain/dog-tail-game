@@ -1,7 +1,9 @@
 # Dog Tail Game — design and development plan
 
 **Status:** Approved baseline, now implemented as the first desktop release. See `README.md` for shipped features, verification, and the deferred backlog.  
-**Date:** September 6, 2026.  
+**Date:** September 6, 2026.
+
+**Latest approved rule change:** HP no longer regenerates. A bandage kit restores up to 30 HP when used with Q. Running-speed hard impacts cause a 0.8-second stumble; sprint-speed impacts cause a 2.2-second fall/get-up penalty while the round timer and dog continue. These supersede the original health and collision tuning below.  
 **Goal:** Prove that chasing, anticipating, and briefly catching a cartoon dog's tail is fun in a small first-person browser game.
 
 All gameplay values below are starting hypotheses for playtesting, not measured balance results. The room observations come from all five supplied photographs. Technology recommendations draw on the linked official documentation; the choice between viable stacks is a project-specific judgment.

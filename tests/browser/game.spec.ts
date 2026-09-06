@@ -51,3 +51,17 @@ test('a hard impact can end a round, while a collected juice box is a timed abil
   await page.evaluate(()=>{const d=(window as any).__dogGame;d.place({x:4.8,z:3.9},{x:0,z:3},-Math.PI/2);d.state().hp=4;d.state().buff=null;d.state().buffTime=0;});
   await page.keyboard.down('ShiftLeft');await page.keyboard.down('KeyW');await expect(page.getByRole('heading',{name:'Nap time.'})).toBeVisible();await page.keyboard.up('KeyW');await page.keyboard.up('ShiftLeft');expect((await snap(page)).ended).toBe('health');
 });
+test('sprint impacts knock the toddler down, pause freezes recovery, and bandages restore health',async({page})=>{
+  await boot(page);await start(page);
+  await page.evaluate(()=>{const d=(window as any).__dogGame;d.place({x:4.8,z:3.9},{x:0,z:3},-Math.PI/2);});
+  await page.keyboard.down('ShiftLeft');await page.keyboard.down('KeyW');
+  await expect.poll(async()=>(await snap(page)).knockedDown).toBeGreaterThan(1.5);
+  await page.keyboard.up('KeyW');await page.keyboard.up('ShiftLeft');
+  await page.waitForTimeout(250);const fallen=await snap(page);expect(fallen.eyeHeight).toBeLessThan(.5);expect(fallen.hp).toBe(88);await page.screenshot({path:'/private/tmp/dog-tail-knockdown.png'});
+  await page.keyboard.down('KeyS');await page.waitForTimeout(150);await page.keyboard.up('KeyS');const locked=await snap(page);expect(locked.player.x).toBeCloseTo(fallen.player.x,3);expect(locked.time).toBeGreaterThan(fallen.time);
+  await page.keyboard.press('Escape');const paused=await snap(page);await page.waitForTimeout(250);expect((await snap(page)).knockedDown).toBe(paused.knockedDown);
+  await page.getByRole('button',{name:'Back to mischief'}).click();await expect.poll(async()=>(await snap(page)).knockedDown).toBe(0);
+  expect((await snap(page)).hp).toBe(88);
+  await page.evaluate(()=>{const d=(window as any).__dogGame;d.place({x:2.6,z:2.8},{x:0,z:3});d.freezeDog();});
+  await expect(page.locator('#pickup')).toHaveText('Bandage kit');await page.keyboard.press('KeyQ');await expect.poll(async()=>(await snap(page)).hp).toBe(100);await expect(page.locator('#pickup')).toHaveText('Empty pocket');
+});

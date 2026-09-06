@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest';
-import { newRound,catchTail,consumeTreat,spendTreat,hardImpact,tickRules,finish,impactDamage } from '../../src/rules/round';
+import { newRound,catchTail,consumeTreat,spendTreat,hardImpact,tickRules,finish,impactDamage,healWithPickup } from '../../src/rules/round';
 function caught(s:ReturnType<typeof newRound>){s.immunity=0;return catchTail(s);}
 describe('catch and treat economy',()=>{
   it('awards exactly one catch during immunity and one treat per three catches',()=>{const s=newRound();expect(catchTail(s)).toBe(120);expect(catchTail(s)).toBe(0);caught(s);caught(s);expect(s.catches).toBe(3);expect(s.treats).toBe(1);expect(s.progress).toBe(0);expect(s.anger).toBe(54);});
@@ -17,7 +17,10 @@ describe('scoring',()=>{
 describe('health and time',()=>{
   it('uses speed thresholds and prevents repeated damage',()=>{expect([1.99,2,3.2,4.5].map(impactDamage)).toEqual([0,4,8,12]);const s=newRound();expect(hardImpact(s,5)).toBe(12);expect(hardImpact(s,5)).toBe(0);expect(s.hp).toBe(88);expect(s.hits).toBe(1);});
   it('teddy halves damage but does not preserve combo',()=>{const s=newRound();s.buff='stuffie';s.chain=4;expect(hardImpact(s,5)).toBe(6);expect(s.chain).toBe(0);expect(s.clean).toBe(false);});
-  it('starts regeneration after eight seconds and caps health',()=>{const s=newRound();hardImpact(s,4);tickRules(s,7,false,false);expect(s.hp).toBe(92);tickRules(s,1,false,false);expect(s.hp).toBe(95);tickRules(s,3,false,false);expect(s.hp).toBe(100);});
+  it('never regenerates health by waiting',()=>{const s=newRound();hardImpact(s,4);tickRules(s,60,false,false);expect(s.hp).toBe(92);});
+  it('knocks sprinting players down while time continues, then recovers',()=>{const s=newRound();hardImpact(s,5.2);expect(s.knockedDown).toBe(2.2);expect(catchTail(s)).toBe(0);expect(hardImpact(s,5.2)).toBe(0);tickRules(s,1,false,false);expect(s.time).toBe(1);expect(s.knockedDown).toBeCloseTo(1.2);tickRules(s,1.2,false,false);expect(s.knockedDown).toBeCloseTo(0);expect(s.hp).toBe(88);});
+  it('stumbles at running speed without falling',()=>{const s=newRound();hardImpact(s,3.8);expect(s.stagger).toBe(.8);expect(s.knockedDown).toBe(0);});
+  it('heals only with a usable bandage and keeps it at full health',()=>{const s=newRound();s.pickup='bandage';expect(healWithPickup(s)).toBe(0);expect(s.pickup).toBe('bandage');s.hp=85;expect(healWithPickup(s)).toBe(15);expect(s.hp).toBe(100);expect(s.pickup).toBeNull();s.hp=40;expect(healWithPickup(s)).toBe(0);s.pickup='bandage';s.knockedDown=1;expect(healWithPickup(s)).toBe(0);s.knockedDown=0;expect(healWithPickup(s)).toBe(30);});
   it('cools only the time beyond four seconds and not while eating',()=>{const s=newRound();s.anger=50;tickRules(s,10,true,false);expect(s.anger).toBe(38);tickRules(s,10,true,true);expect(s.anger).toBe(38);expect(s.cooling).toBe(0);});
   it('new round resets effects, cooldowns, scoring and resources',()=>{const s=newRound();s.buff='juice';s.buffTime=5;s.score=500;expect(newRound()).toMatchObject({buff:null,buffTime:0,score:0,treats:0,time:0,ended:null,hp:100,immunity:0});});
   it('freezes rules once terminal',()=>{const s=newRound();finish(s,'anger');tickRules(s,100,true,false);expect(s.time).toBe(0);expect(catchTail(s)).toBe(0);});
